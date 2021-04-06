@@ -26,14 +26,24 @@ startup
 		    timer.CurrentTimingMethod = TimingMethod.GameTime;
         }
 	}
+    
+    settings.Add("ilMode", false, "IL Mode (auto start on every level)");
 
     vars.waitForPlayerEnable = false;
     vars.startOnPlayerEnable = false;
 }
 
+
 init
 {
     var _globalInstancePtr = IntPtr.Zero;
+    //26861568
+    //[16600] Version: 1036288 <- Chapter Select Patch
+
+
+    
+
+
 
     if(!vars.scanCooldown.IsRunning)
     {
@@ -66,10 +76,29 @@ init
         throw new Exception("init not ready");
     }
     //_global.g + 0x100 -> SceneLoading
+
+    string dll_path = modules.First().FileName + "\\..\\Maquette_Data\\Managed\\Assembly-CSharp.dll";
+	long dll_size = new System.IO.FileInfo(dll_path).Length;
+	print("Version: " + dll_size.ToString());
+    version = dll_size.ToString();
+
+    int playerEnableOffset = 0x0;
+    switch(dll_size)
+    {
+        case 1036288:
+            playerEnableOffset = 0x8;
+            break;
+        default: //1016320 is release version
+            playerEnableOffset = 0x0;
+            break;
+    }
+
     var loadedSceneDP = new DeepPointer(_globalInstancePtr+0x2, 0x0, 0x100, 0x78, 0x14);
     var fadeDoneDP = new DeepPointer(_globalInstancePtr+0x2, 0x0, 0x100, 0xA0);
     var loadProgressDP = new DeepPointer(_globalInstancePtr+0x2, 0x0, 0x100, 0x9C);
-    var playerEnabledDP = new DeepPointer(_globalInstancePtr+0x2, 0x30);
+    /* Original release
+    var playerEnabledDP = new DeepPointer(_globalInstancePtr+0x2, 0x30); */
+    var playerEnabledDP = new DeepPointer(_globalInstancePtr+0x2, 0x30 + playerEnableOffset);
 
     vars.loadedScene = new StringWatcher(loadedSceneDP, 250);
     vars.loadFadeDone = new MemoryWatcher<bool>(fadeDoneDP);
@@ -101,7 +130,7 @@ isLoading
 
 start
 {
-    if(vars.loadedScene.Current == "Chapter_0" && !vars.loadFadeDone.Current)
+    if((vars.loadedScene.Current == "Chapter_0" || settings["ilMode"]) && !vars.loadFadeDone.Current)
         vars.startOnPlayerEnable = true;
 
     if(vars.startOnPlayerEnable && vars.playerEnabled.Current)
